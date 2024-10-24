@@ -112,6 +112,10 @@ p {
     margin: 10px;
 }
 
+.item img {
+	    max-width:100%;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .item {
