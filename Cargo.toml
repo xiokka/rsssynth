@@ -1,0 +1,9 @@
+[package]
+name = "rsssynth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.38"
+rss = "2.0.9"
+
