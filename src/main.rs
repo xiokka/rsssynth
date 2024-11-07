@@ -1,10 +1,9 @@
 use chrono::DateTime;
-use chrono::NaiveDate;
 use std::fs::File;
 use std::io::BufReader;
 use rss::Channel;
 use rss::Item;
-
+use std::io::Write;
 
 fn items_to_html(items: Vec<Item>) -> String {
     let mut feed = String::new();
@@ -15,35 +14,39 @@ fn items_to_html(items: Vec<Item>) -> String {
     let default_pub_date = "No Date".to_string();
     let default_description = "No Description".to_string();
 
-    for item in items {
-        let item_author = item.author.as_ref().unwrap_or(&default_item_title);
+for i in 0..items.len() {
+    let item = &items[i]; // Access the item by index
+    let item_author = item.author.as_ref().unwrap_or(&default_item_title);
+    let item_title = item.title.as_ref().unwrap_or(&default_item_title);
+    let pub_date = item.pub_date.as_ref().unwrap_or(&default_pub_date);
+    let description = item.description.as_ref().unwrap_or(&default_description);
 
-        let item_title = item.title.as_ref().unwrap_or(&default_item_title);
-        let pub_date = item.pub_date.as_ref().unwrap_or(&default_pub_date);
-        let description = item.description.as_ref().unwrap_or(&default_description);
+    let mut this_item = format!(
+        "<div class=\"item\"><h2>{}</h2> <h2>{}</h2> <p><i>{}</i></p> <p>{}</p>",
+        item_author, item_title, pub_date, description
+    );
 
-        let mut this_item = format!(
-            "<div class=\"item\"><h2>{}</h2> <h2>{}</h2> <p><i>{}</i></p> <p>{}</p>",
-            item_author, item_title, pub_date, description
-        );
-
-        if item.enclosure != None {
-		let enclosure = item.enclosure.unwrap();
-		let mut length:u64 = enclosure.length.parse().unwrap(); // bytes
-		length = (length / 1024); // kb
-		let mut unit:String = "KB".to_string();
-		if length > 1024 {
-			length = length / 1024; // mb
-			unit = "MB".to_string();
-		}
-		this_item.push_str(&format!("<a href=\"{}\">📎See attached media [{} {} {}]</a>", enclosure.url.to_string(), length.to_string(), unit,  enclosure.mime_type.to_string()));
+    if let Some(enclosure) = &item.enclosure {
+        let mut length: u64 = enclosure.length.parse().unwrap_or(0); // bytes
+        length /= 1024; // Convert to KB
+        let mut unit = "KB".to_string();
+        
+        if length > 1024 {
+            length /= 1024; // Convert to MB
+            unit = "MB".to_string();
         }
-	this_item.push_str("</div>");
-
-        feed.push_str(&this_item);
-	
+        
+        this_item.push_str(&format!(
+            "<a href=\"{}\">📎See attached media [{} {}]</a>",
+            enclosure.url,
+            length,
+            unit
+        ));
     }
-
+    
+    this_item.push_str("</div>");
+    feed.push_str(&this_item);
+}
     feed
 }
 
@@ -53,19 +56,16 @@ fn items_to_html(items: Vec<Item>) -> String {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Microblog</title>
+    <title>rsssynth</title>
     <style>
-	body {
-background-color: #feffee;
-opacity: 1;
-background-image:  linear-gradient(#6a0005 8px, transparent 8px), linear-gradient(90deg, #6a0005 8px, transparent 8px), linear-gradient(#6a0005 4px, transparent 4px), linear-gradient(90deg, #6a0005 4px, #feffee 4px);
-background-size: 200px 200px, 200px 200px, 40px 40px, 40px 40px;
-background-position: -8px -8px, -8px -8px, -4px -4px, -4px -4px;
+	.item img {
+		max-width: 100%;
+	}
 
-	    color: #444;
+	body {
+	    color: #6a0005;
 	    font-family: monospace;
 	    margin: 0;
-	    padding: 20px;
 	}
 header {
     padding: 4px;
@@ -90,8 +90,8 @@ p {
     outline: 1px solid black;
     display: flex;
     flex-wrap: wrap; 
-    justify-content: space-between; 
-    margin: 10px auto; 
+    justify-content: space-between;
+    margin: 0 10px 10px;
     align-items: flex-start; 
     gap: 10px;
     max-width: 1200px;
@@ -101,7 +101,7 @@ p {
 
 .item {
     outline: 1px solid black;
-    width: calc(33.333% - 20px); /* Three items per row with spacing */
+   /* width: calc(33.333% - 20px); /* Three items per row with spacing */
     box-sizing: border-box; 
     float:left;
     color: black;
@@ -112,22 +112,19 @@ p {
     margin: 10px;
 }
 
-.item img {
-	    max-width:100%;
-}
-
 /* Responsive adjustments */
-@media (max-width: 768px) {
+/* @media (max-width: 768px) {
     .item {
         width: calc(50% - 20px); /* Two items per row on smaller screens */
-    }
+/*     }
 }
 
 @media (max-width: 480px) {
     .item {
         width: calc(100% - 20px); /* One item per row on very small screens */
-    }
-}
+/*     }
+ }
+*/
 
 a {
     color: #4CAF50;
@@ -144,17 +141,17 @@ a:hover {
 
 <div class="container">
 	<header>
-	    Microblog
+		rsssynth
 	</header>
 	<div class="posts">
-
 "#;
 
 use std::fs;
 use std::path::Path;
 use std::env;
-
-fn main() -> std::io::Result<()> {
+use std::io;
+use std::cmp::Ordering;
+fn main() -> io::Result<()> {
 	let args: Vec<String> = env::args().collect();
 	if args.len() <= 1 {
 		println!("No arguments provided. Please direct me to a feeds directory.");
@@ -190,17 +187,15 @@ fn main() -> std::io::Result<()> {
 	            }
 	        }
 	}
-
-	    all_entries.extend(channel.items);
+	all_entries.extend(channel.items);
         }
     }
 
 
     // Sort items by pub_date in descending order
-    all_entries.sort_by(|a, b| {
-        let date_a = a.pub_date.as_ref().and_then(|date| DateTime::parse_from_str(date, "%a, %d %b %Y %H:%M:%S %z").ok());
-        let date_b = b.pub_date.as_ref().and_then(|date| DateTime::parse_from_str(date, "%a, %d %b %Y %H:%M:%S %z").ok());
-
+    all_entries.sort_unstable_by(|a, b| {
+        let date_a = a.pub_date.as_ref().and_then(|date| DateTime::parse_from_rfc2822(date).ok());
+        let date_b = b.pub_date.as_ref().and_then(|date| DateTime::parse_from_rfc2822(date).ok());
         match (date_a, date_b) {
             (Some(d_a), Some(d_b)) => d_b.cmp(&d_a), // Reverse the order for descending sort
             (None, Some(_)) => std::cmp::Ordering::Less, // `None` comes before `Some`
@@ -210,10 +205,28 @@ fn main() -> std::io::Result<()> {
     });
 
 
+    // Create index.html file
+    let mut file = File::create("index.html")?;
+    file.write_all(microblog_html.as_bytes())?;
+    let items_html = items_to_html(all_entries.clone());
+    file.write_all(items_html.as_bytes())?;
+    file.write_all(b"</div> </div> </body> </html>")?;
 
-    println!("{}", microblog_html);
-    println!("{}", items_to_html(all_entries));
-    println!("</div> </div> </body> </html>");
 
+    // Create a new vector with a copy of the first element
+    let latest_entry = if let Some(first_element) = all_entries.get(0).cloned() {
+        vec![first_element]
+    } else {
+        Vec::new() // Return an empty vector if original_vector is empty
+    };
+
+    // Create last_update file
+    let mut file = File::create("last_update.html")?;
+    file.write_all(microblog_html.as_bytes())?;
+    let items_html = items_to_html(latest_entry);
+    file.write_all(items_html.as_bytes())?;
+    file.write_all(b"</div> </div> </body> </html>")?;
+
+    println!("HTML files generated.");
     Ok(())
 }
