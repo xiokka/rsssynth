@@ -74,7 +74,7 @@ a:hover {
 </head>
 <body>
 <div class="container">
-	<div>
+	<div style="width: 100%">
         <header>
                 rsssynth
         </header>
