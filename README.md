@@ -10,3 +10,4 @@ rsssynth feeds/
 ```bash
 rsssynth feeds.txt
 ```
+# my_rsssynth_instance
